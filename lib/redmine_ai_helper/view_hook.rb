@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module RedmineAiHelper
-  # Hook to display the chat screen in the sidebar
+  # Hook to display the AI Helper UI (FAB + popup chat panel) and other view integrations
   class ViewHook < Redmine::Hook::ViewListener
     render_on :view_layouts_base_html_head, partial: "ai_helper/shared/html_header"
     render_on :view_layouts_base_body_top, partial: "ai_helper/chat/sidebar"

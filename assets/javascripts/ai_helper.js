@@ -4,13 +4,13 @@ class AiHelper {
     additional_info: {}
   };
   userId = 'anonymous';
-  chat_fold_storage_key = 'aihelper-fold-flag_anonymous';
+  popup_state_key = 'aihelper-popup-state_anonymous';
   interactiveOptionsHandlersInitialized = false;
 
   // Method to update user ID without recreating the instance
   setUserId(userId) {
     this.userId = userId;
-    this.chat_fold_storage_key = `aihelper-fold-flag_${userId}`;
+    this.popup_state_key = `aihelper-popup-state_${userId}`;
   }
 
   set_form_handlers = function () {
@@ -512,7 +512,7 @@ class AiHelper {
     xhr.onload = function () {
       if (xhr.status === 200) {
         ai_helper.close_dropdown_menu();
-        ai_helper.fold_chat(false);
+        ai_helper.openPopup();
         ai_helper.innerHTMLwithScripts(chatArea, xhr.responseText);
         chatArea.scrollTop = 0;
       } else {
@@ -561,67 +561,86 @@ class AiHelper {
     xhr.send();
   };
 
-  fold_chat = function (flag, disable_animation = false) {
-    const chatArea = document.getElementById("aihelper-foldable-area");
-    const arrow_down = document.getElementById("aihelper-arrow-down");
-    const arrow_left = document.getElementById("aihelper-arrow-left");
+  // ── Popup open/close ──
 
-    if (!chatArea || !arrow_down || !arrow_left) return;
+  initPopup = function () {
+    const fab = document.getElementById('aihelper-fab');
+    const closeBtn = document.getElementById('aihelper-close-btn');
 
-    if (flag) {
-      if (disable_animation) {
-        chatArea.style.display = "none";
-      } else {
-        // Alternative for slideUp animation
-        const height = chatArea.scrollHeight;
-        chatArea.style.height = height + "px";
-        chatArea.style.overflow = "hidden";
-        chatArea.style.transition = "height 300ms";
-        setTimeout(() => {
-          chatArea.style.height = "0px";
-        }, 10);
-        setTimeout(() => {
-          chatArea.style.display = "none";
-          chatArea.style.height = "";
-          chatArea.style.overflow = "";
-          chatArea.style.transition = "";
-        }, 310);
-      }
-      arrow_down.style.display = "none";
-      arrow_left.style.display = "block";
-    } else {
-      if (disable_animation) {
-        chatArea.style.display = "block";
-      } else {
-        // Alternative for slideDown animation
-        chatArea.style.display = "block";
-        const height = chatArea.scrollHeight;
-        chatArea.style.height = "0px";
-        chatArea.style.overflow = "hidden";
-        chatArea.style.transition = "height 300ms";
-        setTimeout(() => {
-          chatArea.style.height = height + "px";
-        }, 10);
-        setTimeout(() => {
-          chatArea.style.height = "";
-          chatArea.style.overflow = "";
-          chatArea.style.transition = "";
-        }, 310);
-      }
-      arrow_down.style.display = "block";
-      arrow_left.style.display = "none";
+    if (fab) {
+      fab.addEventListener('click', function () {
+        ai_helper.togglePopup();
+      });
     }
-    // Save the flag value to local storage
-    localStorage.setItem(this.chat_fold_storage_key, flag);
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function () {
+        ai_helper.closePopup();
+      });
+    }
+
+    // Restore persisted state
+    const saved = localStorage.getItem(this.popup_state_key);
+    if (saved === 'open') {
+      this.openPopup();
+    }
+  };
+
+  togglePopup = function () {
+    const popup = document.getElementById('aihelper-popup');
+    if (!popup) return;
+    if (popup.style.display === 'none' || !popup.style.display) {
+      this.openPopup();
+    } else {
+      this.closePopup();
+    }
+  };
+
+  openPopup = function () {
+    const popup = document.getElementById('aihelper-popup');
+    const fab = document.getElementById('aihelper-fab');
+    if (!popup) return;
+
+    popup.style.display = 'flex';
+    if (fab) fab.classList.add('hidden');
+    localStorage.setItem(this.popup_state_key, 'open');
+
+    // Scroll chat to bottom when opening
+    const chatConversation = document.getElementById('aihelper-chat-conversation');
+    if (chatConversation) {
+      chatConversation.scrollTop = chatConversation.scrollHeight;
+    }
+
+    // Focus input
+    setTimeout(function () {
+      const input = document.getElementById('ai-helper-message-input');
+      if (input) input.focus();
+    }, 100);
+  };
+
+  closePopup = function () {
+    const popup = document.getElementById('aihelper-popup');
+    const fab = document.getElementById('aihelper-fab');
+    if (!popup) return;
+
+    popup.style.display = 'none';
+    if (fab) fab.classList.remove('hidden');
+    localStorage.setItem(this.popup_state_key, 'closed');
+
+    // Also close dropdown if open
+    this.close_dropdown_menu();
+  };
+
+  // Backward-compatible alias — old code may still call fold_chat
+  fold_chat = function (flag) {
+    if (flag) {
+      this.closePopup();
+    } else {
+      this.openPopup();
+    }
   };
 
   init_fold_flag = function () {
-    const flag = localStorage.getItem(this.chat_fold_storage_key);
-    if (flag === "true") {
-      this.fold_chat(true, true);
-    } else {
-      this.fold_chat(false, true);
-    }
+    // No-op, replaced by initPopup
   };
 
   innerHTMLwithScripts = function (element, html) {
