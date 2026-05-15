@@ -29,6 +29,10 @@
   fill: #fff;
   stroke: #fff;
 }
+.aihelper-fab img {
+  width: 32px;
+  height: 32px;
+}
 .aihelper-fab.hidden { display: none; }
 
 /* ── Popup Panel ── */
