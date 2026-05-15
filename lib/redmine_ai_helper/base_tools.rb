@@ -361,8 +361,7 @@ module RedmineAiHelper
     # @return [Boolean] true if accessible, false otherwise
     def accessible_project?(project)
       return false unless project.visible?
-      return false unless project.module_enabled?(:ai_helper)
-      User.current.allowed_to?({ controller: :ai_helper, action: :chat_form }, project)
+      User.current.logged?
     end
 
     private

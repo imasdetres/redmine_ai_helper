@@ -2,15 +2,14 @@
 
 module RedmineAiHelper
   module Util
-    # Utility class for checking AI Helper module permissions on projects.
+    # Utility class for checking AI Helper availability on projects.
     class PermissionChecker
-      # Check if the AI Helper module is enabled and accessible for the given project and user.
-      # Returns true only when:
-      # - project exists and is persisted (has an id)
-      # - user has the specified permission on the project
-      #   (allowed_to? internally checks module_enabled? as well)
+      # Check if AI Helper is available for the given project and user.
+      # Returns true when the project exists and the user is logged in.
+      # The ai_helper project module does NOT need to be explicitly enabled;
+      # the FAB and chat are available on every project page.
       def self.module_enabled?(project:, user: User.current, permission: :view_ai_helper)
-        !!(project&.id && user.allowed_to?(permission, project))
+        !!(project&.id && user.logged?)
       end
     end
   end

@@ -410,10 +410,6 @@ module RedmineAiHelper
         # Get all visible projects except current project
         eligible_projects = Project.visible
           .where.not(id: @project.id)
-          .select do |proj|
-            proj.module_enabled?(:ai_helper) &&
-              User.current.allowed_to?(:view_ai_helper, proj)
-          end
 
         return Issue.none if eligible_projects.empty?
 
