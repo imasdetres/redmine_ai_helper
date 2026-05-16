@@ -3,7 +3,7 @@
   project = @project || instance_variable_get(:@project) || (respond_to?(:project) ? project : nil)
 
   # Skip rendering if no project is available or user doesn't have permission
-  if RedmineAiHelper::Util::PermissionChecker.module_enabled?(project: project, permission: { controller: :ai_helper, action: :project_health }) and AiHelperSetting.find_or_create.model_profile
+  if RedmineAiHelper::Util::PermissionChecker.module_enabled?(project: project, permission: { controller: :ai_helper, action: :project_health }) and AiHelperSetting.find_or_create.model_profile and AiHelperSetting.feature_health_report_enabled?
     # Safely access params
     version_id = defined?(params) ? params[:version_id] : nil
     start_date = defined?(params) ? params[:start_date] : nil

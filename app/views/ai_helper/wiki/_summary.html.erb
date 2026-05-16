@@ -1,4 +1,4 @@
-<% if RedmineAiHelper::Util::PermissionChecker.module_enabled?(project: @project, permission: { controller: :ai_helper, action: :wiki_summary }) and AiHelperSetting.find_or_create.model_profile and controller_name == 'wiki' and action_name == 'show' %>
+<% if RedmineAiHelper::Util::PermissionChecker.module_enabled?(project: @project, permission: { controller: :ai_helper, action: :wiki_summary }) and AiHelperSetting.find_or_create.model_profile and AiHelperSetting.feature_wiki_summary_enabled? and controller_name == 'wiki' and action_name == 'show' %>
 
 <% if @page&.id %>
 

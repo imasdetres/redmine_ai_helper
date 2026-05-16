@@ -234,4 +234,93 @@ class AiHelperSettingTest < ActiveSupport::TestCase
       assert_equal true, AiHelperSetting.mcp_server_enabled?
     end
   end
+
+  # ─── Feature toggles ─────────────────────────────────────────────────────
+
+  context "FEATURE_TOGGLES constant" do
+    should "contain all expected feature toggle names" do
+      expected = %w[
+        feature_chat_enabled
+        feature_issue_summary_enabled
+        feature_wiki_summary_enabled
+        feature_issue_reply_enabled
+        feature_subtask_generation_enabled
+        feature_auto_completion_enabled
+        feature_typo_check_enabled
+        feature_assignment_suggestion_enabled
+        feature_health_report_enabled
+        feature_stuff_todo_enabled
+        feature_duplicate_check_enabled
+      ]
+
+      assert_equal expected, AiHelperSetting::FEATURE_TOGGLES
+    end
+
+    should "be frozen" do
+      assert_predicate AiHelperSetting::FEATURE_TOGGLES, :frozen?
+    end
+  end
+
+  context "feature toggle defaults" do
+    should "default all feature toggles to true" do
+      AiHelperSetting::FEATURE_TOGGLES.each do |toggle|
+        assert_equal true, @setting.public_send(toggle),
+          "Expected #{toggle} to default to true"
+      end
+    end
+  end
+
+  context "feature toggle instance read/write" do
+    AiHelperSetting::FEATURE_TOGGLES.each do |toggle|
+      should "allow setting #{toggle} to false and back to true" do
+        @setting.public_send(:"#{toggle}=", false)
+        @setting.save!
+        @setting.reload
+
+        assert_equal false, @setting.public_send(toggle)
+
+        @setting.public_send(:"#{toggle}=", true)
+        @setting.save!
+        @setting.reload
+
+        assert_equal true, @setting.public_send(toggle)
+      end
+    end
+  end
+
+  context "feature toggle class methods" do
+    AiHelperSetting::FEATURE_TOGGLES.each do |toggle|
+      should "define class method #{toggle}? that returns true when enabled" do
+        @setting.update!(toggle => true)
+
+        assert_equal true, AiHelperSetting.public_send(:"#{toggle}?")
+      end
+
+      should "define class method #{toggle}? that returns false when disabled" do
+        @setting.update!(toggle => false)
+
+        assert_equal false, AiHelperSetting.public_send(:"#{toggle}?")
+      end
+    end
+  end
+
+  context "feature toggles safe_attributes" do
+    should "include all feature toggles in safe_attributes" do
+      AiHelperSetting::FEATURE_TOGGLES.each do |toggle|
+        @setting.safe_attributes = { toggle => "0" }
+        @setting.save!
+        @setting.reload
+
+        assert_equal false, @setting.public_send(toggle),
+          "Expected #{toggle} to be settable via safe_attributes to false"
+
+        @setting.safe_attributes = { toggle => "1" }
+        @setting.save!
+        @setting.reload
+
+        assert_equal true, @setting.public_send(toggle),
+          "Expected #{toggle} to be settable via safe_attributes to true"
+      end
+    end
+  end
 end

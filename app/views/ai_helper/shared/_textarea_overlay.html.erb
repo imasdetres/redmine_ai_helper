@@ -3,12 +3,20 @@
 <%
   # Determine project from @issue if @project is not available
   project = @project || (@issue&.project)
+  # Cache feature toggle lookups
+  _ai_setting = AiHelperSetting.find_or_create
+  _auto_completion_on = _ai_setting.feature_auto_completion_enabled
+  _typo_check_on = _ai_setting.feature_typo_check_enabled
+  _duplicate_check_on = _ai_setting.feature_duplicate_check_enabled
+  _assignment_suggestion_on = _ai_setting.feature_assignment_suggestion_enabled
 %>
 <% if RedmineAiHelper::Util::PermissionChecker.module_enabled?(project: project) %>
 
+<% if _auto_completion_on || _typo_check_on %>
 <!-- Create checkboxes in ERB with proper Redmine sprite_icon -->
 <div id="ai-helper-description-checkbox-container" class="ai-helper-autocompletion-controls" style="display: none;">
   <div style="display: flex; justify-content: space-between; align-items: center;">
+    <% if _auto_completion_on %>
     <span>
       <input type="checkbox" id="ai-helper-autocompletion-description-toggle" />
       <label for="ai-helper-autocompletion-description-toggle">
@@ -16,16 +24,20 @@
         <%= t('ai_helper.autocompletion.common_toggle_label') %>
       </label>
     </span>
+    <% end %>
 
+    <% if _typo_check_on %>
     <!-- Typo check button -->
     <%= link_to "javascript:void(0)", id: "ai-helper-typo-check-description-btn", class: "icon icon-edit" do %>
       <%= sprite_icon("ai-helper-robot", plugin: :redmine_ai_helper) %>
       <%= t('ai_helper.typo_check.check_button') %>
     <% end %>
+    <% end %>
   </div>
 </div>
+<% end %>
 
-<% if @issue&.new_record? && AiHelperSetting.vector_search_enabled? %>
+<% if @issue&.new_record? && AiHelperSetting.vector_search_enabled? && _duplicate_check_on %>
 <!-- Duplicate check button for new issues -->
 <div id="ai-helper-duplicate-check-container" class="ai-helper-autocompletion-controls" style="display: none;">
   <div style="display: flex; flex-direction: column; gap: 8px;">
@@ -56,9 +68,10 @@
   removeExistingNotesCheckbox();
 </script>
 
-<% if @issue&.persisted? && !@issue.new_record? %>
+<% if @issue&.persisted? && !@issue.new_record? && (_auto_completion_on || _typo_check_on) %>
 <div id="ai-helper-notes-checkbox-container" class="ai-helper-autocompletion-controls" style="display: none;">
   <div style="display: flex; justify-content: space-between; align-items: center;">
+    <% if _auto_completion_on %>
     <span>
       <input type="checkbox" id="ai-helper-autocompletion-notes-toggle" />
       <label for="ai-helper-autocompletion-notes-toggle">
@@ -66,16 +79,20 @@
         <%= t('ai_helper.autocompletion.common_toggle_label') %>
       </label>
     </span>
+    <% end %>
 
+    <% if _typo_check_on %>
     <!-- Typo check button -->
     <%= link_to "javascript:void(0)", id: "ai-helper-typo-check-notes-btn", class: "icon icon-edit" do %>
       <%= sprite_icon("ai-helper-robot", plugin: :redmine_ai_helper) %>
       <%= t('ai_helper.typo_check.check_button') %>
     <% end %>
+    <% end %>
   </div>
 </div>
 <% end %>
 
+<% if _typo_check_on %>
 <!-- Typo Control Panels for Issue Description and Notes -->
 <div id="ai-helper-typo-control-panel-description" class="ai-helper-typo-control-panel" style="display: none;">
   <button type="button" class="ai-helper-typo-apply-all-btn">
@@ -94,6 +111,7 @@
     <%= t('ai_helper.typo_check.close') %>
   </button>
 </div>
+<% end %>
 
 <script>
 
@@ -389,9 +407,15 @@ function initializeAssignmentSuggestion() {
 }
 
 setTimeout( function() {
+  <% if _auto_completion_on || _duplicate_check_on %>
   initalizeIssueCompletion();
+  <% end %>
+  <% if _typo_check_on %>
   initializeIssueTypoChecker();
+  <% end %>
+  <% if _assignment_suggestion_on %>
   initializeAssignmentSuggestion();
+  <% end %>
 }, 500); // Delay to ensure DOM is fully loaded
 
 </script>
@@ -399,8 +423,10 @@ setTimeout( function() {
 <!-- AI Helper auto-completion not available (project module disabled or insufficient permissions) -->
 <% end %>
 
+<% if _typo_check_on %>
 <!-- Hidden templates for typo check buttons -->
 <div id="ai-helper-typo-button-templates" style="display: none;">
   <button type="button" class="ai-helper-typo-accept-btn-template"><%= sprite_icon("ai-helper-check", plugin: :redmine_ai_helper) %></button>
   <button type="button" class="ai-helper-typo-reject-btn-template"><%= sprite_icon("ai-helper-x", plugin: :redmine_ai_helper) %></button>
 </div>
+<% end %>

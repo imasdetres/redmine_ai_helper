@@ -1,5 +1,5 @@
 
-<% if RedmineAiHelper::Util::PermissionChecker.module_enabled?(project: @project, permission: { controller: :ai_helper, action: :issue_summary }) and AiHelperSetting.find_or_create.model_profile %>
+<% if RedmineAiHelper::Util::PermissionChecker.module_enabled?(project: @project, permission: { controller: :ai_helper, action: :issue_summary }) and AiHelperSetting.find_or_create.model_profile and AiHelperSetting.feature_issue_summary_enabled? %>
 
 
 <%= javascript_tag do %>

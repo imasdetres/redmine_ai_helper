@@ -215,4 +215,42 @@ class AiHelperSettingsControllerTest < ActionController::TestCase
       assert_select "input[type=checkbox][name='ai_helper_setting[mcp_server_enabled]']"
     end
   end
+
+  # ─── Feature toggle settings ──────────────────────────────────────────────
+
+  context "feature toggle settings" do
+    should "render all feature toggle checkboxes on index" do
+      get :index
+
+      assert_response :success
+      AiHelperSetting::FEATURE_TOGGLES.each do |toggle|
+        assert_select "input[type=checkbox][name='ai_helper_setting[#{toggle}]']",
+          { minimum: 1 }, "Expected checkbox for #{toggle} to be rendered"
+      end
+    end
+
+    AiHelperSetting::FEATURE_TOGGLES.each do |toggle|
+      should "save #{toggle} to false" do
+        @ai_helper_setting.update_column(toggle.to_sym, true)
+        post :update, params: { ai_helper_setting: { toggle => "0" } }
+
+        assert_redirected_to action: :index
+        @ai_helper_setting.reload
+
+        assert_equal false, @ai_helper_setting.public_send(toggle),
+          "Expected #{toggle} to be saved as false"
+      end
+
+      should "save #{toggle} to true" do
+        @ai_helper_setting.update_column(toggle.to_sym, false)
+        post :update, params: { ai_helper_setting: { toggle => "1" } }
+
+        assert_redirected_to action: :index
+        @ai_helper_setting.reload
+
+        assert_equal true, @ai_helper_setting.public_send(toggle),
+          "Expected #{toggle} to be saved as true"
+      end
+    end
+  end
 end

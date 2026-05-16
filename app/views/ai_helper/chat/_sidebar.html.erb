@@ -1,4 +1,4 @@
-<% if RedmineAiHelper::Util::PermissionChecker.module_enabled?(project: @project, permission: { controller: :ai_helper, action: :chat_form }) and AiHelperSetting.find_or_create.model_profile %>
+<% if RedmineAiHelper::Util::PermissionChecker.module_enabled?(project: @project, permission: { controller: :ai_helper, action: :chat_form }) and AiHelperSetting.find_or_create.model_profile and AiHelperSetting.feature_chat_enabled? %>
 
   <%# ── FAB (Floating Action Button) — bottom-right, always visible ── %>
   <button id="aihelper-fab" class="aihelper-fab" type="button" title="<%= t(:label_ai_helper) %>">

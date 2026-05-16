@@ -1,12 +1,17 @@
 <%
   project = @wiki&.project || @project
+  # Cache feature toggle lookups
+  _ai_setting_wiki = AiHelperSetting.find_or_create
+  _wiki_auto_completion_on = _ai_setting_wiki.feature_auto_completion_enabled
+  _wiki_typo_check_on = _ai_setting_wiki.feature_typo_check_enabled
 %>
 
 
-<% if params[:controller] == 'wiki' && (params[:action] == 'edit' || params[:action] == 'show') && RedmineAiHelper::Util::PermissionChecker.module_enabled?(project: project) && User.current.allowed_to?(:edit_wiki_pages, project) %>
+<% if params[:controller] == 'wiki' && (params[:action] == 'edit' || params[:action] == 'show') && RedmineAiHelper::Util::PermissionChecker.module_enabled?(project: project) && User.current.allowed_to?(:edit_wiki_pages, project) && (_wiki_auto_completion_on || _wiki_typo_check_on) %>
 
 <div id="ai-helper-wiki-checkbox-container" class="ai-helper-autocompletion-controls" style="display: none;">
   <p style="display: flex; justify-content: space-between; align-items: center;">
+    <% if _wiki_auto_completion_on %>
     <span>
       <input type="checkbox" id="ai-helper-autocompletion-wiki-toggle" />
       <label for="ai-helper-autocompletion-wiki-toggle">
@@ -14,15 +19,19 @@
         <%= t('ai_helper.autocompletion.common_toggle_label') %>
       </label>
     </span>
+    <% end %>
 
+    <% if _wiki_typo_check_on %>
     <!-- Typo check button -->
     <%= link_to "javascript:void(0)", id: "ai-helper-typo-check-wiki-btn", class: "icon icon-edit" do %>
       <%= sprite_icon("ai-helper-robot", plugin: :redmine_ai_helper) %>
       <%= t('ai_helper.typo_check.check_button') %>
     <% end %>
+    <% end %>
   </p>
 </div>
 
+<% if _wiki_typo_check_on %>
 <!-- Typo Control Panel for Wiki -->
 <div id="ai-helper-typo-control-panel-wiki" class="ai-helper-typo-control-panel" style="display: none;">
   <button type="button" class="ai-helper-typo-apply-all-btn">
@@ -32,8 +41,10 @@
     <%= t('ai_helper.typo_check.close') %>
   </button>
 </div>
+<% end %>
 
 <script>
+<% if _wiki_auto_completion_on %>
 function initializeWikiCompletion() {
   if (window.aiHelperWikiCompletionInitialized) {
     return;
@@ -117,7 +128,9 @@ function initializeWikiCompletion() {
 
   window.aiHelperWikiCompletionInitialized = true;
 }
+<% end %>
 
+<% if _wiki_typo_check_on %>
 // Initialize wiki typo checking with direct button binding
 function initializeWikiTypoChecker() {
   const wikiTextarea = document.getElementById('content_text');
@@ -148,10 +161,15 @@ function initializeWikiTypoChecker() {
     });
   }
 }
+<% end %>
 
 setTimeout(function() {
+  <% if _wiki_auto_completion_on %>
   initializeWikiCompletion();
+  <% end %>
+  <% if _wiki_typo_check_on %>
   initializeWikiTypoChecker();
+  <% end %>
 }, 500);
 
 </script>
@@ -159,8 +177,10 @@ setTimeout(function() {
 <!-- AI Helper wiki auto-completion not available -->
 <% end %>
 
+<% if _wiki_typo_check_on %>
 <!-- Hidden templates for typo check buttons -->
 <div id="ai-helper-typo-button-templates" style="display: none;">
   <button type="button" class="ai-helper-typo-accept-btn-template"><%= sprite_icon("ai-helper-check", plugin: :redmine_ai_helper) %></button>
   <button type="button" class="ai-helper-typo-reject-btn-template"><%= sprite_icon("ai-helper-x", plugin: :redmine_ai_helper) %></button>
 </div>
+<% end %>

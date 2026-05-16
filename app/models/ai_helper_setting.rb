@@ -14,11 +14,27 @@ class AiHelperSetting < ApplicationRecord
 
   before_save :clear_vector_model_profile_id_if_disabled
 
+  # Feature toggle column names (used for class-method generation and safe_attributes)
+  FEATURE_TOGGLES = %w[
+    feature_chat_enabled
+    feature_issue_summary_enabled
+    feature_wiki_summary_enabled
+    feature_issue_reply_enabled
+    feature_subtask_generation_enabled
+    feature_auto_completion_enabled
+    feature_typo_check_enabled
+    feature_assignment_suggestion_enabled
+    feature_health_report_enabled
+    feature_stuff_todo_enabled
+    feature_duplicate_check_enabled
+  ].freeze
+
   safe_attributes "model_profile_id", "additional_instructions", "version", "vector_search_enabled", "vector_search_uri", "vector_search_api_key", "embedding_model", "dimension", "vector_search_index_name", "vector_search_index_type", "embedding_url",
     "attachment_send_enabled", "attachment_max_size_mb",
     "use_think_model", "think_model_profile_id",
     "use_vector_model_profile", "vector_model_profile_id",
-    "mcp_server_enabled"
+    "mcp_server_enabled",
+    *FEATURE_TOGGLES
 
   validates :attachment_max_size_mb,
     numericality: { only_integer: true, greater_than_or_equal_to: 1 },
@@ -52,6 +68,14 @@ class AiHelperSetting < ApplicationRecord
     # @return [Boolean]
     def mcp_server_enabled?
       setting.mcp_server_enabled
+    end
+
+    # Generate class-level predicate methods for each feature toggle.
+    # e.g. AiHelperSetting.feature_chat_enabled? delegates to setting.feature_chat_enabled
+    FEATURE_TOGGLES.each do |toggle|
+      define_method(:"#{toggle}?") do
+        setting.public_send(toggle)
+      end
     end
   end
 
