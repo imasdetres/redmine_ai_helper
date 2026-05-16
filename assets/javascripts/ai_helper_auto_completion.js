@@ -113,11 +113,9 @@ class AiHelperAutoCompletion {
       this.overlay.style.height = rect.height + 'px';
     };
 
-    // Ensure parent has relative positioning for overlay
+    // Ensure parent has relative positioning and white background for overlay
     const parent = this.textarea.parentNode;
-    if (window.getComputedStyle(parent).position === 'static') {
-      parent.style.position = 'relative';
-    }
+    parent.classList.add('ai-helper-textarea-parent-relative');
 
     // Insert overlay after textarea
     parent.insertBefore(this.overlay, this.textarea.nextSibling);
@@ -128,8 +126,6 @@ class AiHelperAutoCompletion {
     // Ensure textarea is above overlay and can receive input
     this.textarea.style.position = 'relative';
     this.textarea.style.zIndex = '10'; // Higher z-index to ensure textarea is on top
-    // Keep background transparent to show overlay suggestions
-    this.textarea.style.backgroundColor = 'transparent';
   }
 
   attachEventListeners() {
@@ -366,8 +362,9 @@ class AiHelperAutoCompletion {
     // Update overlay position to match textarea exactly
     this.updateOverlayPosition();
 
-    // Hide textarea temporarily and show overlay with full content
+    // Hide textarea text and background temporarily to show overlay with suggestion
     this.textarea.style.color = 'transparent';
+    this.textarea.style.backgroundColor = 'transparent';
 
     // Set background color for overlay to match textarea
     const bgColor = this.getTextareaBackgroundColor();
@@ -445,12 +442,12 @@ class AiHelperAutoCompletion {
     this.currentSuggestion = null;
     if (this.overlay) {
       this.overlay.innerHTML = '';
-      this.overlay.style.backgroundColor = 'transparent';
       // Reset scrolling settings
       this.resetScrolling();
     }
-    // Restore textarea text visibility
+    // Restore textarea text and background visibility
     this.textarea.style.color = '';
+    this.textarea.style.backgroundColor = '';
   }
 
   // Sync overlay scroll with textarea scroll

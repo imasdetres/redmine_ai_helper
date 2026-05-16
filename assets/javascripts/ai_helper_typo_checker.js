@@ -45,9 +45,7 @@ class AiHelperTypoChecker {
 
     // Position panel at bottom-right of textarea
     const parent = this.textarea.parentNode;
-    if (window.getComputedStyle(parent).position === 'static') {
-      parent.classList.add('ai-helper-textarea-parent-relative');
-    }
+    parent.classList.add('ai-helper-textarea-parent-relative');
     
     // Move control panel to textarea's parent if not already there
     if (this.controlPanel.parentNode !== parent) {
@@ -138,11 +136,9 @@ class AiHelperTypoChecker {
       this.controlPanel.style.zIndex = '25'; // Above overlay
     };
 
-    // Ensure parent has relative positioning for overlay (same as autocomplete)
+    // Ensure parent has relative positioning and white background for overlay (same as autocomplete)
     const parent = this.textarea.parentNode;
-    if (window.getComputedStyle(parent).position === 'static') {
-      parent.classList.add('ai-helper-textarea-parent-relative');
-    }
+    parent.classList.add('ai-helper-textarea-parent-relative');
 
     // Insert overlay after textarea (same as autocomplete)
     parent.insertBefore(this.overlay, this.textarea.nextSibling);
@@ -897,7 +893,6 @@ class AiHelperTypoChecker {
     if (this.overlay) {
       this.overlay.classList.remove('ai-helper-typo-overlay-active', 'ai-helper-typo-overlay-scrollable');
       this.overlay.innerHTML = '';
-      this.overlay.style.backgroundColor = 'transparent';
       
       // Reset scrolling settings
       this.resetScrolling();
