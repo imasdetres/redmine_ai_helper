@@ -11,6 +11,7 @@ class AiHelper::StreamingTest < ActiveSupport::TestCase
     end
 
     def write(data)
+      raise ActionController::Live::ClientDisconnected, "client disconnected" if @simulate_disconnect
       writes << data
     end
 
@@ -21,12 +22,18 @@ class AiHelper::StreamingTest < ActiveSupport::TestCase
     def closed?
       closed
     end
+
+    # Enable disconnect simulation for testing ClientDisconnected handling.
+    def simulate_disconnect!
+      @simulate_disconnect = true
+    end
   end
 
   ResponseStub = Struct.new(:headers, :stream)
 
   class DummyContext
     include AiHelper::Streaming
+    include RedmineAiHelper::Logger
 
     attr_reader :response, :stream
 
@@ -50,6 +57,7 @@ class AiHelper::StreamingTest < ActiveSupport::TestCase
     assert_equal "text/event-stream", context.response.headers["Content-Type"]
     assert_equal "no-cache", context.response.headers["Cache-Control"]
     assert_equal "keep-alive", context.response.headers["Connection"]
+    assert_equal "no", context.response.headers["X-Accel-Buffering"]
   end
 
   def test_write_chunk_formats_server_sent_event_payload
@@ -59,6 +67,15 @@ class AiHelper::StreamingTest < ActiveSupport::TestCase
 
     assert_equal 1, context.stream.writes.size
     assert_equal "data: {\"foo\":\"bar\"}\n\n", context.stream.writes.first
+  end
+
+  def test_write_heartbeat_writes_sse_comment
+    context = DummyContext.new
+
+    context.send(:write_heartbeat)
+
+    assert_equal 1, context.stream.writes.size
+    assert_equal ": heartbeat\n\n", context.stream.writes.first
   end
 
   def test_stream_llm_response_streams_chunks_and_closes_stream
@@ -73,11 +90,14 @@ class AiHelper::StreamingTest < ActiveSupport::TestCase
     end
 
     assert_equal "text/event-stream", context.response.headers["Content-Type"]
-    assert_equal 3, context.stream.writes.size
 
-    initial_chunk = parse_chunk(context.stream.writes[0])
-    streamed_chunk = parse_chunk(context.stream.writes[1])
-    final_chunk = parse_chunk(context.stream.writes[2])
+    # Filter out any heartbeat writes (unlikely in fast tests, but be safe)
+    data_writes = context.stream.writes.reject { |w| w.start_with?(": ") }
+    assert_equal 3, data_writes.size
+
+    initial_chunk = parse_chunk(data_writes[0])
+    streamed_chunk = parse_chunk(data_writes[1])
+    final_chunk = parse_chunk(data_writes[2])
 
     expected_id = "chatcmpl-#{@fixed_hex}"
 
@@ -123,7 +143,64 @@ class AiHelper::StreamingTest < ActiveSupport::TestCase
     end
 
     assert_predicate context.stream, :closed?
-    assert_equal 1, context.stream.writes.size, "initial chunk should be written before the error"
+    data_writes = context.stream.writes.reject { |w| w.start_with?(": ") }
+    assert_equal 1, data_writes.size, "initial chunk should be written before the error"
+  end
+
+  def test_stream_llm_response_rescues_client_disconnected_gracefully
+    context = DummyContext.new
+
+    with_fixed_random do
+      travel_to @fixed_time do
+        # Write the initial chunk, then simulate client disconnect
+        context.send(:stream_llm_response) do |stream_proc|
+          context.stream.simulate_disconnect!
+          # This should not raise — ClientDisconnected is rescued internally
+        end
+      end
+    end
+
+    # Stream should be closed (via ensure block) and no exception should propagate
+    assert_predicate context.stream, :closed?
+  end
+
+  def test_start_heartbeat_thread_writes_comments_periodically
+    context = DummyContext.new
+
+    # Use a very short interval for testing
+    original_interval = AiHelper::Streaming::HEARTBEAT_INTERVAL_SECONDS
+    AiHelper::Streaming.send(:remove_const, :HEARTBEAT_INTERVAL_SECONDS)
+    AiHelper::Streaming.const_set(:HEARTBEAT_INTERVAL_SECONDS, 0.05)
+
+    thread = context.send(:start_heartbeat_thread)
+    sleep 0.15 # Allow ~3 heartbeats
+    thread.kill
+    thread.join(1)
+
+    heartbeat_writes = context.stream.writes.select { |w| w == ": heartbeat\n\n" }
+    assert heartbeat_writes.size >= 2, "Expected at least 2 heartbeats, got #{heartbeat_writes.size}"
+  ensure
+    AiHelper::Streaming.send(:remove_const, :HEARTBEAT_INTERVAL_SECONDS)
+    AiHelper::Streaming.const_set(:HEARTBEAT_INTERVAL_SECONDS, original_interval)
+  end
+
+  def test_start_heartbeat_thread_stops_on_client_disconnect
+    context = DummyContext.new
+
+    original_interval = AiHelper::Streaming::HEARTBEAT_INTERVAL_SECONDS
+    AiHelper::Streaming.send(:remove_const, :HEARTBEAT_INTERVAL_SECONDS)
+    AiHelper::Streaming.const_set(:HEARTBEAT_INTERVAL_SECONDS, 0.05)
+
+    thread = context.send(:start_heartbeat_thread)
+    sleep 0.08 # Let at least one heartbeat fire
+    context.stream.simulate_disconnect!
+    sleep 0.15 # Give time for thread to encounter the error and exit
+
+    assert_not thread.alive?, "Heartbeat thread should have stopped after client disconnect"
+  ensure
+    thread&.kill
+    AiHelper::Streaming.send(:remove_const, :HEARTBEAT_INTERVAL_SECONDS)
+    AiHelper::Streaming.const_set(:HEARTBEAT_INTERVAL_SECONDS, original_interval)
   end
 
   def test_send_interactive_options_event_writes_sse_event_when_options_present
@@ -174,9 +251,10 @@ class AiHelper::StreamingTest < ActiveSupport::TestCase
       end
     end
 
-    # 3 data chunks + 1 interactive_options event
-    assert_equal 4, context.stream.writes.size
-    options_event = context.stream.writes.last
+    # Filter out heartbeats, expect 3 data chunks + 1 interactive_options event
+    data_writes = context.stream.writes.reject { |w| w.start_with?(": ") }
+    assert_equal 4, data_writes.size
+    options_event = data_writes.last
 
     assert_match(/\Aevent: interactive_options\n/, options_event)
   end
@@ -192,9 +270,10 @@ class AiHelper::StreamingTest < ActiveSupport::TestCase
       end
     end
 
-    # Only 3 data chunks, no options event
-    assert_equal 3, context.stream.writes.size
-    context.stream.writes.each do |write|
+    # Filter out heartbeats, only 3 data chunks, no options event
+    data_writes = context.stream.writes.reject { |w| w.start_with?(": ") }
+    assert_equal 3, data_writes.size
+    data_writes.each do |write|
       assert_match(/\Adata: /, write)
     end
   end

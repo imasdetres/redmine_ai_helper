@@ -8,6 +8,12 @@ module AiHelper
   module Streaming
     extend ActiveSupport::Concern
 
+    # Interval between SSE keepalive comments, in seconds.
+    # Prevents reverse proxies (e.g. nginx with default proxy_read_timeout=60s)
+    # from closing the connection during long-running LLM tool-calling phases
+    # where no content chunks are emitted.
+    HEARTBEAT_INTERVAL_SECONDS = 15
+
     private
 
     # Prepare headers required for SSE streaming.
@@ -17,6 +23,7 @@ module AiHelper
       response.headers["Content-Type"] = "text/event-stream"
       response.headers["Cache-Control"] = "no-cache"
       response.headers["Connection"] = "keep-alive"
+      response.headers["X-Accel-Buffering"] = "no"
     end
 
     # Emit a JSON payload chunk over the SSE stream.
@@ -25,6 +32,17 @@ module AiHelper
     # @return [void]
     def write_chunk(data)
       response.stream.write("data: #{data.to_json}\n\n")
+    end
+
+    # Emit an SSE comment as a keepalive signal.
+    # SSE comments (lines starting with `:`) are silently discarded by the
+    # browser's EventSource / XHR SSE parser, so they don't affect the
+    # application layer, but they do keep the TCP/HTTP2 connection alive
+    # through reverse proxies.
+    #
+    # @return [void]
+    def write_heartbeat
+      response.stream.write(": heartbeat\n\n")
     end
 
     # Emit an interactive options SSE event with the given choices.
@@ -40,7 +58,26 @@ module AiHelper
       ai_helper_logger.error("send_interactive_options_event: JSON serialization error: #{e.message}")
     end
 
+    # Start a background thread that periodically writes SSE keepalive comments.
+    # The thread runs until the returned `Thread` is killed or the stream is closed.
+    #
+    # @return [Thread] the heartbeat thread (caller must kill it when done).
+    def start_heartbeat_thread
+      Thread.new do
+        loop do
+          sleep HEARTBEAT_INTERVAL_SECONDS
+          write_heartbeat
+        end
+      rescue ActionController::Live::ClientDisconnected
+        # Client gone — thread exits silently.
+      rescue IOError
+        # Stream already closed — thread exits silently.
+      end
+    end
+
     # Stream a full LLM response using SSE, yielding a proc to the caller for incremental content.
+    # A background heartbeat thread sends SSE comments every {HEARTBEAT_INTERVAL_SECONDS} seconds
+    # to prevent reverse-proxy timeouts during long-running LLM processing.
     # After streaming completes, checks the full response for an interactive options block and
     # emits a separate SSE event if choices are found.
     #
@@ -67,6 +104,7 @@ module AiHelper
       })
 
       full_content = String.new
+      heartbeat_thread = start_heartbeat_thread
 
       stream_proc = Proc.new do |content|
         full_content << content.to_s
@@ -101,7 +139,10 @@ module AiHelper
 
       options = RedmineAiHelper::Util::InteractiveOptionsParser.extract_options(full_content)
       send_interactive_options_event(options)
+    rescue ActionController::Live::ClientDisconnected
+      ai_helper_logger.warn("SSE stream: client disconnected during LLM response")
     ensure
+      heartbeat_thread&.kill
       response.stream.close if close_stream
     end
   end
