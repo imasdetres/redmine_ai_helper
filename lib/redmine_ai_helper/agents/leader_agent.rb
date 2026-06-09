@@ -219,6 +219,10 @@ module RedmineAiHelper
         )
         langfuse.finish_current_span(output: fixed_json)
         fixed_json
+      rescue JSON::ParserError
+        ai_helper_logger.warn("generate_steps: LLM returned non-JSON response, falling back to empty steps")
+        langfuse.finish_current_span(output: json)
+        { "steps" => [] }
       end
 
       private

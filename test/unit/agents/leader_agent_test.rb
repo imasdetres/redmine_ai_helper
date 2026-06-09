@@ -89,6 +89,18 @@ class LeaderAgentTest < ActiveSupport::TestCase
       assert_kind_of Array, steps["steps"]
     end
 
+    should "fall back to empty steps when LLM returns non-JSON response in generate_steps" do
+      non_json_response = "- No he encontrado una referencia clara a esa tarea"
+      mock_response = mock("Response")
+      mock_response.stubs(:content).returns(non_json_response)
+      @mock_ruby_llm_chat.stubs(:ask).returns(mock_response)
+
+      steps = @agent.generate_steps("find the task", @messages)
+
+      assert_kind_of Hash, steps
+      assert_equal [], steps["steps"]
+    end
+
     should "perform user request successfully" do
       # First call: generate_goal
       goal_json = { "goal" => "test goal", "generate_steps_required" => false }.to_json
