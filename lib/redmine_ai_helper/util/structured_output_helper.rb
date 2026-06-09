@@ -1,14 +1,11 @@
 # frozen_string_literal: true
 
 require "json"
-require "redmine_ai_helper/logger"
 
 module RedmineAiHelper
   module Util
     # Provides format instructions generation and JSON parsing with retry.
     class StructuredOutputHelper
-      extend RedmineAiHelper::Logger
-
       class << self
         # Generate format instructions from a JSON schema.
         # Generates format instructions to embed in a prompt.
@@ -45,8 +42,8 @@ module RedmineAiHelper
         def parse(response:, json_schema:, chat_method: nil, messages: nil)
           parse_json_from_response(response)
         rescue JSON::ParserError => e
-          ai_helper_logger.warn("StructuredOutputHelper: initial JSON parse failed: #{e.message}")
-          ai_helper_logger.warn("StructuredOutputHelper: raw LLM response was: #{response}")
+          logger.warn("StructuredOutputHelper: initial JSON parse failed: #{e.message}")
+          logger.warn("StructuredOutputHelper: raw LLM response was: #{response}")
           raise e unless chat_method && messages
 
           retry_with_llm(
@@ -58,6 +55,11 @@ module RedmineAiHelper
         end
 
         private
+
+        # @return [RedmineAiHelper::CustomLogger] logger instance for class methods
+        def logger
+          RedmineAiHelper::CustomLogger.instance
+        end
 
         # Extract and parse JSON from a response string.
         # Handles JSON wrapped in ```json ... ``` code blocks.
@@ -85,7 +87,7 @@ module RedmineAiHelper
         # @return [Hash, Array] Parsed JSON from retry
         # @raise [JSON::ParserError] If retry also fails
         def retry_with_llm(response:, json_schema:, chat_method:, messages:)
-          ai_helper_logger.info("StructuredOutputHelper: retrying JSON parse with LLM fix prompt")
+          logger.info("StructuredOutputHelper: retrying JSON parse with LLM fix prompt")
           fix_prompt = <<~PROMPT
             The following response was supposed to be a valid JSON object matching the schema below, but it could not be parsed.
 
@@ -105,8 +107,8 @@ module RedmineAiHelper
           fixed_response = chat_method.call(new_messages)
           parse_json_from_response(fixed_response)
         rescue JSON::ParserError => e
-          ai_helper_logger.warn("StructuredOutputHelper: retry also failed: #{e.message}")
-          ai_helper_logger.warn("StructuredOutputHelper: retry LLM response was: #{fixed_response}")
+          logger.warn("StructuredOutputHelper: retry also failed: #{e.message}")
+          logger.warn("StructuredOutputHelper: retry LLM response was: #{fixed_response}")
           raise
         end
       end
