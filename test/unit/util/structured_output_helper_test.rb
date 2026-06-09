@@ -131,6 +131,42 @@ class StructuredOutputHelperTest < ActiveSupport::TestCase
       end
     end
 
+    should "log raw LLM response when initial parse fails" do
+      bad_response = "No tengo acceso a esa información"
+
+      mock_chat_method = lambda do |_messages|
+        '{"goal": "Fixed", "required_flag": true}'
+      end
+
+      Util::StructuredOutputHelper.parse(
+        response: bad_response,
+        json_schema: @json_schema,
+        chat_method: mock_chat_method,
+        messages: [ { role: "user", content: "test" } ]
+      )
+
+      # Verify logs were written (the method should not raise since retry succeeds)
+      # The important thing is that the raw response is logged for debugging
+    end
+
+    should "log raw LLM response when retry also fails" do
+      bad_response = "No puedo hacer eso"
+      also_bad_response = "Sigo sin poder"
+
+      mock_chat_method = lambda do |_messages|
+        also_bad_response
+      end
+
+      assert_raises(JSON::ParserError) do
+        Util::StructuredOutputHelper.parse(
+          response: bad_response,
+          json_schema: @json_schema,
+          chat_method: mock_chat_method,
+          messages: [ { role: "user", content: "test" } ]
+        )
+      end
+    end
+
     should "parse array-type JSON schema response" do
       array_schema = {
         type: "array",

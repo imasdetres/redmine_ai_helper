@@ -57,6 +57,20 @@ class LeaderAgentTest < ActiveSupport::TestCase
       assert_equal "test goal", goal["goal"]
     end
 
+    should "fall back to direct answer when LLM returns non-JSON response in generate_goal" do
+      non_json_response = "No tengo acceso a esa información"
+      mock_response = mock("Response")
+      mock_response.stubs(:content).returns(non_json_response)
+      # Both initial call and retry return non-JSON
+      @mock_ruby_llm_chat.stubs(:ask).returns(mock_response)
+
+      goal = @agent.generate_goal(@messages)
+
+      assert_kind_of Hash, goal
+      assert_equal non_json_response, goal["goal"]
+      assert_equal false, goal["generate_steps_required"]
+    end
+
     should "generate steps correctly" do
       steps_json = {
         "steps" => [

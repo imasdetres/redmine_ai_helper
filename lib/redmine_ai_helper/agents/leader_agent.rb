@@ -62,6 +62,9 @@ module RedmineAiHelper
       end
 
       # Generate a goal for the agents to follow based on the user's request.
+      # When the LLM returns a non-JSON response (e.g. a direct text answer or an
+      # error message), the raw response is treated as a direct answer to the user
+      # with no further agent steps required.
       def generate_goal(messages)
         prompt = load_prompt("leader_agent/goal")
         json_schema = {
@@ -96,6 +99,10 @@ module RedmineAiHelper
         )
         langfuse.finish_current_span(output: fixed_json)
         fixed_json
+      rescue JSON::ParserError
+        ai_helper_logger.warn("generate_goal: LLM returned non-JSON response, treating as direct answer")
+        langfuse.finish_current_span(output: json)
+        { "goal" => json.to_s, "generate_steps_required" => false }
       end
 
       # Generate steps for the agents to follow based on the goal.
