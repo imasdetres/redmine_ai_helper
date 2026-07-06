@@ -69,6 +69,10 @@
     <p>
         <%= f.check_box :mcp_server_enabled %>
     </p>
+    <p>
+        <%= f.check_box :orchestrator_passthrough_enabled %>
+        <em class="info"><%= t("activerecord.attributes.ai_helper_setting.orchestrator_passthrough_description") %></em>
+    </p>
     <hr>
     <fieldset class="collapsible collapsed" id="ai-helper-feature-toggles">
         <legend onclick="toggleFieldset(this);"><%= t(:label_ai_helper_feature_toggles) %></legend>

@@ -34,6 +34,7 @@ class AiHelperSetting < ApplicationRecord
     "use_think_model", "think_model_profile_id",
     "use_vector_model_profile", "vector_model_profile_id",
     "mcp_server_enabled",
+    "orchestrator_passthrough_enabled",
     *FEATURE_TOGGLES
 
   validates :attachment_max_size_mb,
@@ -68,6 +69,14 @@ class AiHelperSetting < ApplicationRecord
     # @return [Boolean]
     def mcp_server_enabled?
       setting.mcp_server_enabled
+    end
+
+    # Returns whether the chat should bypass the multi-agent LeaderAgent
+    # pipeline and forward the user's message to the backend in a single
+    # tool-less call (for backends that are themselves RAG orchestrators).
+    # @return [Boolean]
+    def orchestrator_passthrough_enabled?
+      setting.orchestrator_passthrough_enabled
     end
 
     # Generate class-level predicate methods for each feature toggle.
