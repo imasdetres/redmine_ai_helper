@@ -209,6 +209,8 @@ en:
         organization_id: "Organization ID"
         base_uri: "Base URI"
         max_tokens: "Max tokens"
+        orchestrator_passthrough_enabled: "Orchestrator passthrough (single-call mode)"
+        orchestrator_passthrough_description: "Bypass the multi-agent pipeline and forward the message to the backend in one tool-less call. Use only when this profile's backend is itself a RAG orchestrator (e.g. the i+D3 Oráculo)."
       ai_helper_setting:
         model_profile_id: "Model profile"
         additional_instructions: "Additional instructions"
@@ -226,8 +228,6 @@ en:
         vector_model_profile_id: "Vector model profile"
         vector_model_profile_description: "Use a separate model profile for vector search operations (API credentials and content analysis). Note: the embedding model name is still controlled by the Embedding model setting above."
         mcp_server_enabled: "Enable MCP server"
-        orchestrator_passthrough_enabled: "Orchestrator passthrough (single-call mode)"
-        orchestrator_passthrough_description: "Bypass the multi-agent pipeline and forward the message to the backend in one tool-less call. Use only when the backend is itself a RAG orchestrator (e.g. the i+D3 Oráculo)."
         feature_chat_enabled: "Enable chat"
         feature_issue_summary_enabled: "Enable issue summary"
         feature_wiki_summary_enabled: "Enable wiki summary"

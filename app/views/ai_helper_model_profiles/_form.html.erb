@@ -27,6 +27,10 @@
   <p id="ai-helper-model-base-uri">
     <%= f.text_field :base_uri, size: 90, required: true %>
   </p>
+  <p id="ai-helper-model-orchestrator-passthrough">
+    <%= f.check_box :orchestrator_passthrough_enabled %>
+    <em class="info"><%= t("activerecord.attributes.ai_helper_model_profile.orchestrator_passthrough_description") %></em>
+  </p>
 
 
   <p id="ai-helper-test-connection">
