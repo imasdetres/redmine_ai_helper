@@ -57,6 +57,10 @@
   <% end %>
 </p>
 <% end %>
+<p>
+  <%= label_tag AiHelperModelProfile.human_attribute_name(:orchestrator_passthrough_enabled) %>
+  <%= @model_profile.orchestrator_passthrough_enabled ? l(:general_text_Yes) : l(:general_text_No) %>
+</p>
 <div id="ai_helper_model_type" style="display: none;"><%= @model_profile.llm_type %></div>
 
 <script>

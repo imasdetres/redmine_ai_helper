@@ -40,6 +40,15 @@ module RedmineAiHelper
           task = result[:message]
         end
 
+        # Orchestrator passthrough: when the backend is itself a full RAG
+        # orchestrator, skip the multi-agent LeaderAgent pipeline and forward
+        # the message in a single tool-less call. Avoids double orchestration
+        # (token blow-up, prompt collisions, lost identity). See migration
+        # AddOrchestratorPassthroughToAiHelperSettings.
+        if AiHelperSetting.orchestrator_passthrough_enabled?
+          return passthrough_chat(conversation, proc, option)
+        end
+
         langfuse = RedmineAiHelper::LangfuseUtil::LangfuseWrapper.new(input: task)
         option[:langfuse] = langfuse
         agent = RedmineAiHelper::Agents::LeaderAgent.new(option)
@@ -53,6 +62,81 @@ module RedmineAiHelper
       end
       ai_helper_logger.info "answer: #{answer}"
       AiHelperMessage.new(role: "assistant", content: answer, conversation: conversation)
+    end
+
+    # Forward the conversation to the backend LLM in a SINGLE tool-less call,
+    # bypassing the LeaderAgent multi-agent pipeline. Used when
+    # AiHelperSetting.orchestrator_passthrough_enabled? is true (i.e. the
+    # backend — e.g. the i+D3 Oráculo — is itself a RAG orchestrator).
+    #
+    # Differences vs. the LeaderAgent path, by design:
+    #   * no goal/steps JSON planning and no sub-agent delegation (1 request,
+    #     not 2..N+),
+    #   * no tools attached (the backend drives its own tools; sending tools
+    #     would be rejected),
+    #   * a minimal "focus" context instead of the full leader system prompt,
+    #   * the real end-user email is delegated so the backend can apply
+    #     per-user ACL instead of falling back to the plugin's service account.
+    #
+    # @param conversation [AiHelperConversation] the conversation object
+    # @param proc [Proc, nil] streaming callback invoked with each content chunk
+    # @param option [Hash] controller/action/content_id/project context
+    # @return [AiHelperMessage] the assistant's reply
+    def passthrough_chat(conversation, proc, option = {})
+      messages = conversation.messages_for_openai
+      provider = RedmineAiHelper::LlmProvider.get_llm_provider
+      chat = provider.create_chat(instructions: passthrough_focus_context(option).presence)
+
+      # Delegate the real end-user identity so the backend orchestrator applies
+      # the ACL of the human asking, not the plugin's technical account.
+      if User.current && User.current.logged? && User.current.mail.present?
+        chat.with_params(metadata: { user_email: User.current.mail })
+      end
+
+      # Replay prior turns as plain history; ask with the last user message.
+      messages[0..-2].each do |msg|
+        chat.add_message(role: msg[:role].to_sym, content: msg[:content])
+      end
+      last_message = messages.last
+      answer = +""
+
+      if proc
+        chat.ask(last_message[:content]) do |chunk|
+          content = chunk.content rescue nil
+          if content
+            proc.call(content)
+            answer << content
+          end
+        end
+      else
+        answer = chat.ask(last_message[:content]).content
+      end
+
+      AiHelperMessage.new(role: "assistant", content: answer, conversation: conversation)
+    end
+
+    # Build a minimal "focus" context for passthrough mode from the current
+    # page, so the backend orchestrator knows where the user is without the
+    # heavy leader system prompt. Returns "" when there is nothing to add.
+    # @param option [Hash] controller/action/content_id/project context
+    # @return [String]
+    def passthrough_focus_context(option = {})
+      parts = []
+      project = option[:project]
+      parts << "El usuario está trabajando en el proyecto \"#{project.name}\" (id #{project.id})." if project
+
+      content_id = option[:content_id]
+      if content_id.present?
+        case option[:controller_name].to_s
+        when "issues"
+          parts << "El usuario está viendo la incidencia ##{content_id}."
+        when "wiki"
+          parts << "El usuario está viendo una página de wiki (id #{content_id})."
+        end
+      end
+
+      return "" if parts.empty?
+      "Contexto de la página actual (solo referencia; no lo repitas literalmente):\n" + parts.join("\n")
     end
 
     # Get the summary of the issue using IssueAgent with streaming support

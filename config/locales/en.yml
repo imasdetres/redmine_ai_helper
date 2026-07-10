@@ -209,6 +209,8 @@ en:
         organization_id: "Organization ID"
         base_uri: "Base URI"
         max_tokens: "Max tokens"
+        orchestrator_passthrough_enabled: "Orchestrator passthrough (single-call mode)"
+        orchestrator_passthrough_description: "Bypass the multi-agent pipeline and forward the message to the backend in one tool-less call. Use only when this profile's backend is itself a RAG orchestrator (e.g. the i+D3 Oráculo)."
       ai_helper_setting:
         model_profile_id: "Model profile"
         additional_instructions: "Additional instructions"

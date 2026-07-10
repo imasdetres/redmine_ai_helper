@@ -87,3 +87,6 @@ Gemfile.local
 .serena/
 .qlty/
 .rubocop_todo.yml
+
+# Tests unitarios locales del passthrough (no versionados)
+/test/unit/llm_passthrough_test.rb

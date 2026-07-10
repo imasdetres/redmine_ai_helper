@@ -70,6 +70,16 @@ class AiHelperSetting < ApplicationRecord
       setting.mcp_server_enabled
     end
 
+    # Returns whether the chat should bypass the multi-agent LeaderAgent
+    # pipeline and forward the user's message to the backend in a single
+    # tool-less call (for backends that are themselves RAG orchestrators).
+    # The flag lives on the SELECTED MODEL PROFILE, so the behaviour follows
+    # whichever profile is configured.
+    # @return [Boolean]
+    def orchestrator_passthrough_enabled?
+      !!setting.model_profile&.orchestrator_passthrough_enabled
+    end
+
     # Generate class-level predicate methods for each feature toggle.
     # e.g. AiHelperSetting.feature_chat_enabled? delegates to setting.feature_chat_enabled
     FEATURE_TOGGLES.each do |toggle|
