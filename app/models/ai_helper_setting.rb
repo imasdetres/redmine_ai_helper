@@ -82,9 +82,18 @@ class AiHelperSetting < ApplicationRecord
 
     # Generate class-level predicate methods for each feature toggle.
     # e.g. AiHelperSetting.feature_chat_enabled? delegates to setting.feature_chat_enabled
+    #
+    # These predicates are the single source of truth for whether a feature is
+    # available (views AND controller enforcement). Under orchestrator
+    # passthrough every agent-based feature is force-disabled: against a
+    # backend that is itself a RAG orchestrator they would send the full agent
+    # prompt per call and expect completion/structured output the orchestrator
+    # won't return. Chat is exempt — it IS the passthrough use case.
     FEATURE_TOGGLES.each do |toggle|
       define_method(:"#{toggle}?") do
-        setting.public_send(toggle)
+        return false unless setting.public_send(toggle)
+        return true if toggle == "feature_chat_enabled"
+        !orchestrator_passthrough_enabled?
       end
     end
   end

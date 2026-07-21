@@ -4,11 +4,10 @@
   # Determine project from @issue if @project is not available
   project = @project || (@issue&.project)
   # Cache feature toggle lookups
-  _ai_setting = AiHelperSetting.find_or_create
-  _auto_completion_on = _ai_setting.feature_auto_completion_enabled
-  _typo_check_on = _ai_setting.feature_typo_check_enabled
-  _duplicate_check_on = _ai_setting.feature_duplicate_check_enabled
-  _assignment_suggestion_on = _ai_setting.feature_assignment_suggestion_enabled
+  _auto_completion_on = AiHelperSetting.feature_auto_completion_enabled?
+  _typo_check_on = AiHelperSetting.feature_typo_check_enabled?
+  _duplicate_check_on = AiHelperSetting.feature_duplicate_check_enabled?
+  _assignment_suggestion_on = AiHelperSetting.feature_assignment_suggestion_enabled?
 %>
 <% if RedmineAiHelper::Util::PermissionChecker.module_enabled?(project: project) %>
 
