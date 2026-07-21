@@ -90,3 +90,4 @@ Gemfile.local
 
 # Tests unitarios locales del passthrough (no versionados)
 /test/unit/llm_passthrough_test.rb
+/test/functional/ai_helper_feature_gates_test.rb

@@ -23,6 +23,42 @@ class AiHelperController < ApplicationController
   # @return [String] default scope value
   SIMILAR_ISSUES_DEFAULT_SCOPE = "with_subprojects".freeze
 
+  # Feature toggle predicate that gates each action. Enforced server-side:
+  # the toggles in the settings UI only control whether the frontend is
+  # rendered, but a page loaded before the toggle changed keeps firing
+  # requests (and the endpoints are callable directly), so the check must
+  # live here too.
+  FEATURE_FOR_ACTION = {
+    "chat_form" => :feature_chat_enabled?,
+    "reload" => :feature_chat_enabled?,
+    "chat" => :feature_chat_enabled?,
+    "conversation" => :feature_chat_enabled?,
+    "history" => :feature_chat_enabled?,
+    "call_llm" => :feature_chat_enabled?,
+    "clear" => :feature_chat_enabled?,
+    "issue_summary" => :feature_issue_summary_enabled?,
+    "generate_issue_summary" => :feature_issue_summary_enabled?,
+    "wiki_summary" => :feature_wiki_summary_enabled?,
+    "generate_wiki_summary" => :feature_wiki_summary_enabled?,
+    "generate_issue_reply" => :feature_issue_reply_enabled?,
+    "generate_sub_issues" => :feature_subtask_generation_enabled?,
+    "add_sub_issues" => :feature_subtask_generation_enabled?,
+    "similar_issues" => :feature_duplicate_check_enabled?,
+    "check_duplicates" => :feature_duplicate_check_enabled?,
+    "suggest_completion" => :feature_auto_completion_enabled?,
+    "suggest_wiki_completion" => :feature_auto_completion_enabled?,
+    "check_typos" => :feature_typo_check_enabled?,
+    "suggest_assignees" => :feature_assignment_suggestion_enabled?,
+    "assignable_users_for_tracker" => :feature_assignment_suggestion_enabled?,
+    "project_health" => :feature_health_report_enabled?,
+    "project_health_metadata" => :feature_health_report_enabled?,
+    "project_health_pdf" => :feature_health_report_enabled?,
+    "project_health_markdown" => :feature_health_report_enabled?,
+    "generate_project_health" => :feature_health_report_enabled?,
+    "api_create_health_report" => :feature_health_report_enabled?,
+    "stuff_todo" => :feature_stuff_todo_enabled?,
+  }.freeze
+
   rescue_from ActionDispatch::Http::Parameters::ParseError, with: :handle_parse_error
 
   protect_from_forgery with: :exception
@@ -32,6 +68,7 @@ class AiHelperController < ApplicationController
   before_action :find_project, except: [ :issue_summary, :wiki_summary, :generate_issue_summary, :generate_wiki_summary, :generate_issue_reply, :generate_sub_issues, :add_sub_issues, :similar_issues ]
   before_action :find_user, :create_session, :find_conversation, except: [ :api_create_health_report ]
   before_action :require_login
+  before_action :require_feature_enabled
 
   # Display the chat form in the sidebar
   # @return [void]
@@ -710,6 +747,18 @@ class AiHelperController < ApplicationController
   end
 
   private
+
+  # Server-side enforcement of the feature toggles (see FEATURE_FOR_ACTION).
+  # Also covers orchestrator passthrough: the class-level predicates report
+  # agent-based features as disabled when the selected profile bypasses the
+  # multi-agent pipeline.
+  def require_feature_enabled
+    predicate = FEATURE_FOR_ACTION[action_name]
+    return unless predicate
+    return if AiHelperSetting.public_send(predicate)
+
+    render json: { error: "This AI Helper feature is disabled" }, status: :forbidden
+  end
 
   def build_sub_issue_from_param(issue_param)
     issue = Issue.new
