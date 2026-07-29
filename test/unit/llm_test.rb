@@ -1,5 +1,6 @@
 require File.expand_path("../../test_helper", __FILE__)
 require "redmine_ai_helper/llm"
+require "redmine_ai_helper/agents/leader_agent"
 
 class RedmineAiHelper::LlmTest < ActiveSupport::TestCase
   fixtures :projects, :issues, :issue_statuses, :trackers, :enumerations, :users, :issue_categories, :versions, :custom_fields, :custom_values, :groups_users, :members, :member_roles, :roles, :user_preferences, :wikis, :wiki_pages, :wiki_contents
@@ -24,6 +25,60 @@ class RedmineAiHelper::LlmTest < ActiveSupport::TestCase
       response = @llm.chat(@conversation, nil, { controller_name: "issues", action_name: "show", content_id: 1 })
 
       assert_equal "assistant", response.role
+    end
+
+    context "orchestrator passthrough" do
+      setup do
+        @mock_chat = mock("RubyLLM::Chat")
+        @mock_chat.stubs(:with_params).returns(@mock_chat)
+        @mock_chat.stubs(:add_message)
+
+        @mock_provider = mock("llm_provider")
+        @mock_provider.stubs(:create_chat).returns(@mock_chat)
+        RedmineAiHelper::LlmProvider.stubs(:get_llm_provider).returns(@mock_provider)
+
+        AiHelperSetting.stubs(:orchestrator_passthrough_enabled?).returns(true)
+        @option = { controller_name: "issues", action_name: "show", content_id: 1 }
+      end
+
+      should "bypass the LeaderAgent pipeline" do
+        @mock_chat.stubs(:ask).returns(stub(content: "backend answer"))
+
+        RedmineAiHelper::Agents::LeaderAgent.expects(:new).never
+        RedmineAiHelper::LangfuseUtil::LangfuseWrapper.expects(:new).never
+
+        @llm.chat(@conversation, nil, @option)
+      end
+
+      should "return the backend answer as an assistant message" do
+        @mock_chat.stubs(:ask).returns(stub(content: "backend answer"))
+
+        result = @llm.chat(@conversation, nil, @option)
+
+        assert_equal "assistant", result.role
+        assert_equal "backend answer", result.content
+      end
+
+      should "stream each chunk through the proc and accumulate the answer" do
+        @mock_chat.stubs(:ask).multiple_yields([ stub(content: "Hola ") ], [ stub(content: "mundo") ])
+
+        received = []
+        result = @llm.chat(@conversation, ->(chunk) { received << chunk }, @option)
+
+        assert_equal [ "Hola ", "mundo" ], received
+        assert_equal "Hola mundo", result.content
+      end
+
+      should "log the answer so passthrough requests leave a trace in the log" do
+        @mock_chat.stubs(:ask).returns(stub(content: "backend answer"))
+
+        logger = @llm.ai_helper_logger
+        # General stub first so the specific expectation below takes precedence.
+        logger.stubs(:info)
+        logger.expects(:info).with("answer: backend answer").once
+
+        @llm.chat(@conversation, nil, @option)
+      end
     end
 
     context "issue summary" do

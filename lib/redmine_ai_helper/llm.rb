@@ -83,6 +83,7 @@ module RedmineAiHelper
     # @param option [Hash] controller/action/content_id/project context
     # @return [AiHelperMessage] the assistant's reply
     def passthrough_chat(conversation, proc, option = {})
+      ai_helper_logger.info "passthrough: forwarding to backend orchestrator (LeaderAgent bypassed)"
       messages = conversation.messages_for_openai
       provider = RedmineAiHelper::LlmProvider.get_llm_provider
       chat = provider.create_chat(instructions: passthrough_focus_context(option).presence)
@@ -112,6 +113,10 @@ module RedmineAiHelper
         answer = chat.ask(last_message[:content]).content
       end
 
+      # Mirror the LeaderAgent path's logging. #chat returns early for
+      # passthrough, so without this the request would leave no trace of its
+      # outcome in the log at all.
+      ai_helper_logger.info "answer: #{answer}"
       AiHelperMessage.new(role: "assistant", content: answer, conversation: conversation)
     end
 
